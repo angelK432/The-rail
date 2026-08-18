@@ -1,4 +1,4 @@
-/ Free product-detail lookup: reads the page's own Open Graph / meta tags.
+// Free product-detail lookup: reads the page's own Open Graph / meta tags.
 // No AI calls, no per-lookup cost — just a plain fetch + text parsing.
 
 function decodeEntities(str) {
@@ -15,14 +15,13 @@ function decodeEntities(str) {
 }
 
 function getMeta(html, key, attr) {
-  // Handles both attribute orders: property before content, and content before property.
   const re1 = new RegExp(`<meta[^>]+${attr}=["']${key}["'][^>]*content=["']([^"']*)["']`, "i");
   const re2 = new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*${attr}=["']${key}["']`, "i");
   const m = html.match(re1) || html.match(re2);
   return m ? decodeEntities(m[1].trim()) : "";
 }
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   const url = event.queryStringParameters && event.queryStringParameters.url;
 
   if (!url) {
@@ -69,7 +68,6 @@ exports.handler = async (event) => {
       getMeta(html, "product:price:currency", "property") ||
       getMeta(html, "priceCurrency", "itemprop");
 
-    // Fallback: hunt for a plain currency symbol + number somewhere in the page.
     if (!price) {
       const priceMatch = html.match(/[\$£€]\s?(\d{1,4}(?:[.,]\d{2})?)/);
       if (priceMatch) {
