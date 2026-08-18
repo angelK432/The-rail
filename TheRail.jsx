@@ -59,79 +59,17 @@ function allCategories(data) {
   return data.categories || [];
 }
 
-function parseDetailsResponse(data) {
-  const textBlocks = (data.content || [])
-    .filter((b) => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
-  const cleaned = textBlocks.replace(/```json|```/g, "").trim();
-  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Couldn't read a result back from that link.");
-  const parsed = JSON.parse(jsonMatch[0]);
-  return {
-    name: parsed.name || "",
-    brand: parsed.brand || "",
-    price: typeof parsed.price === "number" ? parsed.price : parseFloat(parsed.price) || 0,
-    currency: (parsed.currency || "NZD").toUpperCase(),
-    imageUrl: parsed.imageUrl || "",
-  };
-}
-
-const DETAILS_JSON_INSTRUCTIONS = `Respond with ONLY a JSON object, no explanation, no markdown fences, no code blocks. Format exactly:\n{"name": "", "brand": "", "price": 0, "currency": "NZD", "imageUrl": ""}\n\nUse the current listed price as a plain number (no currency symbol). Use the three-letter currency code you find on the page (e.g. NZD, AUD, USD, GBP, EUR). imageUrl must be a direct link to the product photo (ending in .jpg, .png, .webp or similar, typically the og:image meta tag or the main product image on the page), not a link to a webpage. If you truly cannot find an image, leave imageUrl as an empty string. If you cannot find something else, make your best reasonable guess from the URL rather than leaving fields blank.`;
-
-async function fetchWithPageFetch(url) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "anthropic-beta": "web-fetch-2025-09-10",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      messages: [
-        {
-          role: "user",
-          content: `Fetch this exact product page and read its content directly: ${url}\n\nFind its real product photo URL, name, brand, price, and currency.\n\n${DETAILS_JSON_INSTRUCTIONS}`,
-        },
-      ],
-      tools: [
-        { type: "web_fetch_20250910", name: "web_fetch", max_uses: 3 },
-        { type: "web_search_20250305", name: "web_search" },
-      ],
-    }),
-  });
-  const data = await response.json();
-  if (!response.ok || data.error) throw new Error("web_fetch unavailable");
-  return parseDetailsResponse(data);
-}
-
-async function fetchWithSearchOnly(url) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      messages: [
-        {
-          role: "user",
-          content: `Search the web to find details for this product page: ${url}\n\n${DETAILS_JSON_INSTRUCTIONS}`,
-        },
-      ],
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
-    }),
-  });
-  const data = await response.json();
-  return parseDetailsResponse(data);
-}
-
 async function fetchProductDetails(url) {
-  try {
-    return await fetchWithPageFetch(url);
-  } catch (e) {
-    return await fetchWithSearchOnly(url);
-  }
+  const response = await fetch(`/.netlify/functions/fetch-product?url=${encodeURIComponent(url)}`);
+  const data = await response.json();
+  if (!response.ok || data.error) throw new Error(data.error || "Couldn't read details from that link.");
+  return {
+    name: data.name || "",
+    brand: data.brand || "",
+    price: typeof data.price === "number" ? data.price : parseFloat(data.price) || 0,
+    currency: (data.currency || "NZD").toUpperCase(),
+    imageUrl: data.imageUrl || "",
+  };
 }
 
 function TotalLine({ items, accent, label }) {
