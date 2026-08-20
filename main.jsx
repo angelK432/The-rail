@@ -14,4 +14,5 @@ function wireStorage() {
       } = await supabase.auth.getUser();
       if (!user) return null;
       const { data, error } = await supabase
-        .from("user
+           .from("user_storage")
+
